@@ -45,4 +45,7 @@ public class OrderPayResultResponse {
 
     @ApiModelProperty(value = "支付宝调起支付参数对象（app支付专用）")
     private AliPayJsResultVo aliPayConfig;
+
+    @ApiModelProperty(value = "支付连接（汇付宝-快捷）")
+    private String payUrl;
 }

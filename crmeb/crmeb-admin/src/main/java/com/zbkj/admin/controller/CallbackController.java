@@ -1,5 +1,6 @@
 package com.zbkj.admin.controller;
 
+import com.zbkj.service.mpay.bean.MPayNotifyData;
 import com.zbkj.service.service.CallbackService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
@@ -54,6 +55,19 @@ public class CallbackController {
         String response = callbackService.weChatRefund(request);
         System.out.println("微信退款回调 response ===> " + response);
         return response;
+    }
+
+
+
+    /**
+     * 微信支付回调
+     */
+    @ApiOperation(value = "mpay回调")
+    @RequestMapping(value = "/mpay")
+    public String mpay(MPayNotifyData mPayNotifyData) {
+        log.error("mpay回调 request ===> " + mPayNotifyData);
+        callbackService.mpay(mPayNotifyData);
+        return "success";
     }
 }
 

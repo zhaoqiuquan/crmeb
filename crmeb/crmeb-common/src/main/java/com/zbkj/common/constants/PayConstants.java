@@ -20,6 +20,7 @@ public class PayConstants {
     public static final String PAY_TYPE_OFFLINE = "offline"; //线下支付
     public static final String PAY_TYPE_ALI_PAY = "alipay"; //支付宝
     public static final String PAY_TYPE_ZERO_PAY = "zeroPay"; // 零元付
+    public static final String PAY_TYPE_HFB_QP = "hfb_qp"; //汇付宝-快捷支付
 
     //支付渠道
     public static final String PAY_CHANNEL_WE_CHAT_H5 = "weixinh5"; //H5唤起微信支付

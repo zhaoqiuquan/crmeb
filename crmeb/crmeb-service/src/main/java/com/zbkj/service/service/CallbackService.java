@@ -1,5 +1,7 @@
 package com.zbkj.service.service;
 
+import com.zbkj.service.mpay.bean.MPayNotifyData;
+
 /**
  * 订单支付回调 service
  * +----------------------------------------------------------------------
@@ -26,4 +28,7 @@ public interface CallbackService {
      * @return String
      */
     String weChatRefund(String request);
+
+
+    void mpay(MPayNotifyData mPayNotifyData);
 }

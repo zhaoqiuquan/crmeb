@@ -22,6 +22,11 @@
             <artifactId>crmeb-service</artifactId>
             <version>${crmeb-service}</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.mariadb.jdbc</groupId>
+            <artifactId>mariadb-java-client</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

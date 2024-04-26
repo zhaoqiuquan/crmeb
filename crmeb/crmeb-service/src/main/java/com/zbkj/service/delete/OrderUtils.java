@@ -76,6 +76,10 @@ public class OrderUtils {
             case PayConstants.PAY_TYPE_ALI_PAY:
                 result = ("1".equals(systemConfigService.getValueByKey(SysConfigConstants.CONFIG_ALI_PAY_STATUS)));
                 break;
+            case PayConstants.PAY_TYPE_HFB_QP:
+//                result = ("1".equals(systemConfigService.getValueByKey(SysConfigConstants.CONFIG_HFB_QP_PAY_STATUS)));
+                result = true;
+                break;
         }
         return result;
     }

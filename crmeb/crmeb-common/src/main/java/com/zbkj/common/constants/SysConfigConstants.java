@@ -76,4 +76,6 @@ public class SysConfigConstants {
     public static final String CONFIG_YUE_PAY_STATUS  = "yue_pay_status";
     /** 支付宝支付状态 */
     public static final String CONFIG_ALI_PAY_STATUS = "ali_pay_status";
+    /** 汇付宝支付状态 */
+    public static final String CONFIG_HFB_QP_PAY_STATUS = "hfb_qp_status";
 }

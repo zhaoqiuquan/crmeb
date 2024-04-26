@@ -88,6 +88,7 @@
 					payType: paytype
 				}).then(res => {
 					let jsConfig = res.data.jsConfig;
+					let payUrl = res.data.payUrl;
 					that.order_id = res.data.orderNo;
 					switch (res.data.payType) {
 						case 'weixin':
@@ -196,6 +197,18 @@
 							uni.hideLoading();
 							location.replace(jsConfig.mwebUrl + '&redirect_url=' + window.location.protocol +
 								'//' + window.location.host + goPages + '&status=1');
+							return that.$util.Tips({
+								title: "支付中",
+								icon: 'success'
+							}, () => {
+								that.$emit('onChangeFun', {
+									action: 'pay_complete'
+								});
+							});
+							break;
+						case 'hfb_qp':
+							uni.hideLoading();
+							location.replace(payUrl);
 							return that.$util.Tips({
 								title: "支付中",
 								icon: 'success'

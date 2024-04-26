@@ -683,6 +683,13 @@
 						title: '可用余额:',
 						number: 0
 					},
+					{
+						name: "快捷支付",
+						icon: "icon-yuezhifu",
+						value: 'yue',
+						title: '快捷支付:',
+						number: 0
+					}
 				],
 				pay_close: false,
 				pay_order_id: '',

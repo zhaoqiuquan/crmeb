@@ -1064,6 +1064,9 @@ public class OrderServiceImpl implements OrderService {
                 isChannel = 7;
             }
         }
+        if (request.getPayType().equals(PayConstants.PAY_TYPE_HFB_QP)) {
+            isChannel = 2;
+        }
 
         StoreOrder storeOrder = new StoreOrder();
         storeOrder.setUid(user.getUid());

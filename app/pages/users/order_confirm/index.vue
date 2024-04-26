@@ -224,6 +224,13 @@
 						value: 'yue',
 						title: '可用余额:',
 						payStatus: 1,
+					},
+					{
+						"name": "快捷支付",
+						"icon": "icon-icon-test",
+						value: 'hfb_qp',
+						title: '银行快捷支付',
+						payStatus: 1,
 					}
 					// {
 					// 	"name": "线下支付", //offlinePayStatu：1开启线下支付；2关闭；offlinePostage：true有邮费
@@ -635,6 +642,7 @@
 					scene: that.productType==='normal'? 0 :1177 //下单时小程序的场景值
 				}).then(res => {
 					let jsConfig = res.data.jsConfig;
+					let payUrl =res.data.payUrl;
 					switch (res.data.payType) {
 						case 'weixin':
 							// #ifdef MP
@@ -761,6 +769,18 @@
 								location.href = jsConfig.mwebUrl + '&redirect_url=' + window.location
 									.protocol + '//' + window.location.host +
 									goPages + '&status=1';
+							}, 100)
+							break;
+						case 'hfb_qp':
+							uni.hideLoading();
+							that.$util.Tips({
+								title: '订单创建成功'
+							}, {
+								tab: 5,
+								url: goPages + '&status=0'
+							});
+							setTimeout(() => {
+								location.href = payUrl;
 							}, 100)
 							break;
 					}

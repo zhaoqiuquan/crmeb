@@ -4,6 +4,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateTime;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.zbkj.common.constants.*;
 import com.zbkj.common.exception.CrmebException;
@@ -27,6 +28,12 @@ import com.zbkj.common.utils.RedisUtil;
 import com.zbkj.common.utils.WxPayUtil;
 import com.zbkj.common.vo.*;
 import com.zbkj.service.delete.OrderUtils;
+import com.zbkj.service.mpay.bean.MPayConfig;
+import com.zbkj.service.mpay.bean.MPayOrderParam;
+import com.zbkj.service.mpay.bean.MPayOrderResult;
+import com.zbkj.service.mpay.bean.MPayOrderResultData;
+import com.zbkj.service.mpay.util.HttpUtil;
+import com.zbkj.service.mpay.util.MPayUtil;
 import com.zbkj.service.service.*;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -38,10 +45,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -162,6 +166,7 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 支付成功处理
+     *
      * @param storeOrder 订单
      */
     @Override
@@ -308,7 +313,7 @@ public class OrderPayServiceImpl implements OrderPayService {
                 autoSendCoupons(storeOrder);
 
                 // 根据配置 打印小票
-                ylyPrintService.YlyPrint(storeOrder.getOrderId(),true);
+                ylyPrintService.YlyPrint(storeOrder.getOrderId(), true);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -362,15 +367,16 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 发送拼团成功通知
+     *
      * @param record 信息参数
-     * @param user 用户
+     * @param user   用户
      */
     private void pushMessagePink(MyRecord record, User user, SystemNotification notification) {
         if (!record.getStr("payType").equals(Constants.PAY_TYPE_WE_CHAT)) {
-            return ;
+            return;
         }
         if (record.getInt("isChannel").equals(2)) {
-            return ;
+            return;
         }
 
         UserToken userToken;
@@ -379,7 +385,7 @@ public class OrderPayServiceImpl implements OrderPayService {
         if (record.getInt("isChannel").equals(Constants.ORDER_PAY_CHANNEL_PUBLIC) && notification.getIsWechat().equals(1)) {
             userToken = userTokenService.getTokenByUserId(user.getUid(), UserConstants.USER_TOKEN_TYPE_WECHAT);
             if (ObjectUtil.isNull(userToken)) {
-                return ;
+                return;
             }
             // 发送微信模板消息
             temMap.put(Constants.WE_CHAT_TEMP_KEY_FIRST, "恭喜您拼团成功！我们将尽快为您发货。");
@@ -391,13 +397,13 @@ public class OrderPayServiceImpl implements OrderPayService {
             // 小程序发送订阅消息
             userToken = userTokenService.getTokenByUserId(user.getUid(), UserConstants.USER_TOKEN_TYPE_ROUTINE);
             if (ObjectUtil.isNull(userToken)) {
-                return ;
+                return;
             }
             // 组装数据
 //        temMap.put("character_string1",  record.getStr("orderNo"));
 //        temMap.put("thing2", record.getStr("proName"));
 //        temMap.put("thing5", "恭喜您拼团成功！我们将尽快为您发货。");
-            temMap.put("character_string10",  record.getStr("orderNo"));
+            temMap.put("character_string10", record.getStr("orderNo"));
             temMap.put("thing7", record.getStr("proName"));
             temMap.put("thing9", "恭喜您拼团成功！我们将尽快为您发货。");
             templateMessageService.pushMiniTemplateMessage(notification.getRoutineId(), temMap, userToken.getToken());
@@ -407,23 +413,24 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 分配佣金
+     *
      * @param storeOrder 订单
      * @return List<UserBrokerageRecord>
      */
     private List<UserBrokerageRecord> assignCommission(StoreOrder storeOrder) {
         // 检测商城是否开启分销功能
         String isOpen = systemConfigService.getValueByKey(Constants.CONFIG_KEY_STORE_BROKERAGE_IS_OPEN);
-        if(StrUtil.isBlank(isOpen) || "0".equals(isOpen)){
+        if (StrUtil.isBlank(isOpen) || "0".equals(isOpen)) {
             return CollUtil.newArrayList();
         }
         // 营销产品不参与
-        if(storeOrder.getCombinationId() > 0 || storeOrder.getSeckillId() > 0 || storeOrder.getBargainId() > 0){
+        if (storeOrder.getCombinationId() > 0 || storeOrder.getSeckillId() > 0 || storeOrder.getBargainId() > 0) {
             return CollUtil.newArrayList();
         }
         // 查找订单所属人信息
         User user = userService.getById(storeOrder.getUid());
         // 当前用户不存在 没有上级 或者 当用用户上级时自己  直接返回
-        if(null == user.getSpreadUid() || user.getSpreadUid() < 1 || user.getSpreadUid().equals(storeOrder.getUid())){
+        if (null == user.getSpreadUid() || user.getSpreadUid() < 1 || user.getSpreadUid().equals(storeOrder.getUid())) {
             return CollUtil.newArrayList();
         }
         // 获取参与分佣的人（两级）
@@ -456,7 +463,8 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 计算佣金
-     * @param record index-分销级数，spreadUid-分销人
+     *
+     * @param record  index-分销级数，spreadUid-分销人
      * @param orderId 订单id
      * @return BigDecimal
      */
@@ -478,12 +486,12 @@ public class OrderPayServiceImpl implements OrderPayService {
             key = Constants.CONFIG_KEY_STORE_BROKERAGE_RATE_TWO;
         }
         String rate = systemConfigService.getValueByKey(key);
-        if(StringUtils.isBlank(rate)){
+        if (StringUtils.isBlank(rate)) {
             rate = "1";
         }
         //佣金比例整数存储， 例如80， 所以计算的时候要除以 10*10
         BigDecimal rateBigDecimal = brokeragePrice;
-        if(StringUtils.isNotBlank(rate)){
+        if (StringUtils.isNotBlank(rate)) {
             rateBigDecimal = new BigDecimal(rate).divide(BigDecimal.TEN.multiply(BigDecimal.TEN));
         }
 
@@ -491,14 +499,14 @@ public class OrderPayServiceImpl implements OrderPayService {
             // 先看商品是否有固定分佣
             StoreProductAttrValue attrValue = storeProductAttrValueService.getById(orderInfoVo.getInfo().getAttrValueId());
             if (orderInfoVo.getInfo().getIsSub()) {// 有固定分佣
-                if(index == 1){
+                if (index == 1) {
                     brokeragePrice = Optional.ofNullable(attrValue.getBrokerage()).orElse(BigDecimal.ZERO);
                 }
-                if(index == 2){
+                if (index == 2) {
                     brokeragePrice = Optional.ofNullable(attrValue.getBrokerageTwo()).orElse(BigDecimal.ZERO);
                 }
             } else {// 系统分佣
-                if(!rateBigDecimal.equals(BigDecimal.ZERO)){
+                if (!rateBigDecimal.equals(BigDecimal.ZERO)) {
                     // 商品没有分销金额, 并且有设置对应等级的分佣比例
                     // 舍入模式向零舍入。
                     if (ObjectUtil.isNotNull(orderInfoVo.getInfo().getVipPrice())) {
@@ -522,6 +530,7 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 获取参与分佣人员（两级）
+     *
      * @param spreadUid 一级分佣人Uid
      * @return List<MyRecord>
      */
@@ -562,6 +571,7 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 余额支付
+     *
      * @param storeOrder 订单
      * @return Boolean Boolean
      */
@@ -629,7 +639,7 @@ public class OrderPayServiceImpl implements OrderPayService {
                     storePink.setStopTime(headPink.getStopTime());
                 } else {
                     DateTime hourTime = cn.hutool.core.date.DateUtil.offsetHour(dateTime, effectiveTime);
-                    long stopTime =  hourTime.getTime();
+                    long stopTime = hourTime.getTime();
                     if (stopTime > storeCombination.getStopTime()) {
                         stopTime = storeCombination.getStopTime();
                     }
@@ -653,8 +663,9 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 订单支付
-     * @param orderPayRequest   支付参数
-     * @param ip                ip
+     *
+     * @param orderPayRequest 支付参数
+     * @param ip              ip
      * @return OrderPayResultResponse
      * 1.微信支付拉起微信预支付，返回前端调用微信支付参数，在之后需要调用微信支付查询接口
      * 2.余额支付，更改对应信息后，加入支付成功处理task
@@ -686,7 +697,7 @@ public class OrderPayServiceImpl implements OrderPayService {
                 storeOrder.setIsChannel(3);
             }
             if (orderPayRequest.getPayType().equals(PayConstants.PAY_TYPE_WE_CHAT)) {
-                switch (orderPayRequest.getPayChannel()){
+                switch (orderPayRequest.getPayChannel()) {
                     case PayConstants.PAY_CHANNEL_WE_CHAT_H5:// H5
                         storeOrder.setIsChannel(2);
                         break;
@@ -697,6 +708,11 @@ public class OrderPayServiceImpl implements OrderPayService {
                         storeOrder.setIsChannel(1);
                         break;
                 }
+            }
+
+            //汇付宝 快捷支付
+            if (orderPayRequest.getPayType().equals(PayConstants.PAY_TYPE_HFB_QP)) {
+                storeOrder.setIsChannel(2);
             }
 
             boolean changePayType = storeOrderService.updateById(storeOrder);
@@ -754,14 +770,55 @@ public class OrderPayServiceImpl implements OrderPayService {
         if (storeOrder.getPayType().equals(PayConstants.PAY_TYPE_OFFLINE)) {
             throw new CrmebException("暂时不支持线下支付");
         }
+        if (orderPayRequest.getPayType().equals(PayConstants.PAY_TYPE_HFB_QP)) {
+            hfb(storeOrder, response);
+            return response;
+        }
+
         response.setStatus(false);
         return response;
     }
 
+
+    public void hfb(StoreOrder storeOrder, OrderPayResultResponse response) {
+        String apiDomain = systemConfigService.getValueByKeyException(Constants.CONFIG_KEY_API_URL);
+        MPayOrderParam param = new MPayOrderParam(storeOrder);
+        param.setNotifyUrl(apiDomain + MPayConfig.notifyUrl);
+        param.setUserId(String.valueOf(storeOrder.getUid()));
+        param.setSign(MPayUtil.sign(param.getFieldMap(), MPayConfig.signKey));
+
+        TreeMap<String, Object> reqParam = param.getFieldMap();
+        String reqResult = HttpUtil.doPost(MPayConfig.apiUrl, reqParam);
+        if (StringUtils.isBlank(reqResult)) {
+            throw new CrmebException("下单请求响应为空");
+        }
+
+        MPayOrderResult orderResult = JSON.parseObject(reqResult, MPayOrderResult.class);
+        if (!orderResult.isSuccess()) {
+            throw new CrmebException("下单请求失败，" + orderResult.getMsg());
+        }
+
+        MPayOrderResultData orderResultData = orderResult.getData();
+        if (!MPayUtil.verifySign(orderResultData.getFieldMap(), MPayConfig.signKey)) {
+            throw new CrmebException("签名不正确");
+        }
+        if (!orderResultData.isSuccess()) {
+            throw new CrmebException(orderResultData.getMsg());
+        }
+        //成功
+
+//        response.setOrderNo(param.getMerchantOrderNo());
+        storeOrder.setOutTradeNo(param.getMerchantOrderNo());
+        storeOrderService.updateById(storeOrder);
+
+        response.setPayUrl((String) orderResultData.getPayInfo());
+    }
+
     /**
      * 预下单
+     *
      * @param storeOrder 订单
-     * @param ip ip
+     * @param ip         ip
      * @return 预下单返回对象
      */
     private Map<String, String> unifiedorder(StoreOrder storeOrder, String ip) {
@@ -826,6 +883,7 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 获取微信预下单对象
+     *
      * @return 微信预下单对象
      */
     private CreateOrderRequestVo getUnifiedorderVo(StoreOrder storeOrder, String openid, String ip, String appId, String mchId, String signKey) {
@@ -852,7 +910,7 @@ public class OrderPayServiceImpl implements OrderPayService {
         vo.setNotify_url(apiDomain + PayConstants.WX_PAY_NOTIFY_API_URI);
         vo.setTrade_type(PayConstants.WX_PAY_TRADE_TYPE_JS);
         vo.setOpenid(openid);
-        if (storeOrder.getIsChannel() == 2){// H5
+        if (storeOrder.getIsChannel() == 2) {// H5
             vo.setTrade_type(PayConstants.WX_PAY_TRADE_TYPE_H5);
             vo.setOpenid(null);
         }
@@ -915,6 +973,7 @@ public class OrderPayServiceImpl implements OrderPayService {
 
     /**
      * 积分添加记录
+     *
      * @return UserIntegralRecord
      */
     private UserIntegralRecord integralRecordInit(StoreOrder storeOrder, Integer balance, Integer integral, String type) {
@@ -926,7 +985,7 @@ public class OrderPayServiceImpl implements OrderPayService {
         integralRecord.setTitle(IntegralRecordConstants.BROKERAGE_RECORD_TITLE_ORDER);
         integralRecord.setIntegral(integral);
         integralRecord.setBalance(balance);
-        if ("order".equals(type)){
+        if ("order".equals(type)) {
             integralRecord.setMark(StrUtil.format("用户付款成功,订单增加{}积分", integral));
         }
         if ("product".equals(type)) {
@@ -959,7 +1018,7 @@ public class OrderPayServiceImpl implements OrderPayService {
         if (storeOrder.getIsChannel().equals(Constants.ORDER_PAY_CHANNEL_PUBLIC) && payNotification.getIsWechat().equals(1)) {
             userToken = userTokenService.getTokenByUserId(user.getUid(), UserConstants.USER_TOKEN_TYPE_WECHAT);
             if (ObjectUtil.isNull(userToken)) {
-                return ;
+                return;
             }
             // 发送微信模板消息
             temMap.put(Constants.WE_CHAT_TEMP_KEY_FIRST, "您的订单已支付成功！");
@@ -973,7 +1032,7 @@ public class OrderPayServiceImpl implements OrderPayService {
             // 小程序发送订阅消息
             userToken = userTokenService.getTokenByUserId(user.getUid(), UserConstants.USER_TOKEN_TYPE_ROUTINE);
             if (ObjectUtil.isNull(userToken)) {
-                return ;
+                return;
             }
             // 组装数据
 //            temMap.put("character_string1", storeOrder.getOrderId());
@@ -989,17 +1048,17 @@ public class OrderPayServiceImpl implements OrderPayService {
     /**
      * 商品购买后根据配置送券
      */
-    private void autoSendCoupons(StoreOrder storeOrder){
+    private void autoSendCoupons(StoreOrder storeOrder) {
         // 根据订单详情获取商品信息
         List<StoreOrderInfoOldVo> orders = storeOrderInfoService.getOrderListByOrderId(storeOrder.getId());
-        if(null == orders){
+        if (null == orders) {
             return;
         }
         List<StoreCouponUser> couponUserList = CollUtil.newArrayList();
         Map<Integer, Boolean> couponMap = CollUtil.newHashMap();
         for (StoreOrderInfoOldVo order : orders) {
             List<StoreProductCoupon> couponsForGiveUser = storeProductCouponService.getListByProductId(order.getProductId());
-            for (int i = 0; i < couponsForGiveUser.size();) {
+            for (int i = 0; i < couponsForGiveUser.size(); ) {
                 StoreProductCoupon storeProductCoupon = couponsForGiveUser.get(i);
                 MyRecord record = storeCouponUserService.paySuccessGiveAway(storeProductCoupon.getIssueCouponId(), storeOrder.getUid());
                 if ("fail".equals(record.getStr("status"))) {
@@ -1026,4 +1085,5 @@ public class OrderPayServiceImpl implements OrderPayService {
             logger.error(StrUtil.format("支付成功领取优惠券，更新数据库失败，订单编号：{}", storeOrder.getOrderId()));
         }
     }
+
 }
